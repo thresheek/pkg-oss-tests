@@ -333,6 +333,7 @@ to load the module), but both are legitimate if a suite needs it.
 |---|---|---|
 | set-misc | 0.34 | done — 18 files, all upstream files converted |
 | encrypted-session | 0.10 | done — 1 file (`sanity.t`) |
+| headers-more | 0bf283ff | done — 7 files (3 upstream files dropped) |
 
 Blocks deliberately dropped from set-misc:
 
@@ -349,3 +350,43 @@ Blocks deliberately dropped from encrypted-session:
 * `echo`, `echo_exec`, `set_encode_base32`, `set_decode_base32`, `set_unescape_uri`
   replaced throughout by inline encrypt→decrypt round-trips; tests 6 and 7 use a
   literal garbage value instead of the upstream's specific tampered base32 ciphertexts.
+
+Blocks deliberately dropped from headers-more:
+
+* `eval.t` — whole file, requires `ngx_http_eval_module` (OpenResty).
+* `input-ua.t` — whole file, all meaningful assertions are SystemTap (`--- stap`)
+  probes checking nginx internal browser-detection struct fields; body-only residuals
+  are too superficial to be worth keeping.
+* `subrequest.t` — whole file, all tests use `echo_location` (echo module).
+* `unused.t` — whole file, all assertions are debug-level `--- error_log` checks
+  (require `--with-debug` build); body-only residuals don't test module behaviour.
+* `sanity.t` TEST 36, 37 — `--- must_die` config-failure tests.
+* `input.t` TEST 3, 4 — `echo_read_request_body` / `echo_request_body` (echo module).
+* `input.t` TEST 23, 29-33 — use `$echo_client_request_headers` (echo module).
+* `input.t` TEST 43 — `content_by_lua`.
+* `input-conn.t` TEST 1 — clearing `Connection: keep-alive` cannot prevent
+  nginx 1.31+ from keeping the connection alive: the keep-alive decision is
+  committed before the rewrite phase, so `http()` in the test times out.
+* `input.t` TEST 24 — `more_set_input_headers 'Accept-Encoding: gzip'` cannot
+  trigger gzip for static-file serving: the gzip module reads its struct field
+  before the rewrite phase.
+* `input.t` TEST 44, 45, 46 — clearing If-Unmodified-Since / If-Match /
+  If-None-Match has no effect: nginx 1.25+ checks these conditional headers from
+  parsed struct fields in the not-modified header filter, after the rewrite phase
+  but reading the pre-parsed values that headers-more cannot update.
+* All `--- stap` / `--- stap_out` assertions (SystemTap) in `input-conn.t`,
+  `input-cookie.t`, and `input.t` — body assertions are kept.
+* All `--- error_log` / `--- no_error_log` assertions, per the policy above.
+
+Implementation note — `return 200 $var` vs `proxy_pass` for input-header tests:
+When a location adds any `proxy_set_header` directive it cancels **all**
+inherited server-level `proxy_set_header` directives (nginx inheritance rule).
+Locations that need multiple proxy headers must list them all explicitly.
+
+Implementation note — `return 200 $var` vs `proxy_pass` for input-header tests:
+`more_set/clear_input_headers` registers a rewrite-phase handler. The rewrite
+module's own handler (which evaluates `return 200 $var`) runs first in that same
+phase, before headers-more modifies the headers. As a result, `return 200 $var`
+always sees the pre-modification value. Tests that need to observe the modified
+variable must use `proxy_pass` to a backend location, where `return 200 $var`
+runs in the content phase — after the rewrite phase is complete.

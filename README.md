@@ -24,3 +24,4 @@ Tests are converted from the test suite shipped with the listed module version.
 |--------|---------|
 | [set-misc](set-misc/) | 0.34 |
 | [encrypted-session](encrypted-session/) | 0.10 |
+| [headers-more](headers-more/) | 0bf283ff |
