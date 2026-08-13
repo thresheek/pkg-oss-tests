@@ -332,6 +332,7 @@ to load the module), but both are legitimate if a suite needs it.
 | Module | Version | Status |
 |---|---|---|
 | set-misc | 0.34 | done — 18 files, all upstream files converted |
+| encrypted-session | 0.10 | done — 1 file (`sanity.t`) |
 
 Blocks deliberately dropped from set-misc:
 
@@ -340,3 +341,11 @@ Blocks deliberately dropped from set-misc:
 * `quote-sql.t` TEST 8 — requires `set_iconv` (libiconv-enabled OpenResty build).
 * `rand.t` TEST 9 — marked `--- SKIP` upstream (location numbering jumps `/rand8` → `/rand10`).
 * All `--- error_log` / `--- no_error_log` assertions, per the policy above.
+
+Blocks deliberately dropped from encrypted-session:
+
+* `sanity.t` TEST 8 — requires `content_by_lua` + `ngx.sleep` (OpenResty only).
+* All `--- error_log` assertions (expires values), per the policy above.
+* `echo`, `echo_exec`, `set_encode_base32`, `set_decode_base32`, `set_unescape_uri`
+  replaced throughout by inline encrypt→decrypt round-trips; tests 6 and 7 use a
+  literal garbage value instead of the upstream's specific tampered base32 ciphertexts.
