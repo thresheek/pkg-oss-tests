@@ -27,3 +27,4 @@ Tests are converted from the test suite shipped with the listed module version.
 | [headers-more](headers-more/) | 0bf283ff |
 | [subs-filter](subs-filter/) | c6f825fa |
 | [brotli](brotli/) | 1.0.0rc |
+| [fips-check](fips-check/) | 0.1 |

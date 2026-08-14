@@ -336,6 +336,7 @@ to load the module), but both are legitimate if a suite needs it.
 | headers-more | 0bf283ff | done — 7 files (3 upstream files dropped) |
 | subs-filter | c6f825fa | done — 6 files, all upstream files converted |
 | brotli | 1.0.0rc | done — 2 files (`brotli.t`, `brotli_h2.t`) |
+| fips-check | 0.1 | done — 1 file (`fips_check.t`) |
 
 Blocks deliberately dropped from set-misc:
 
@@ -410,6 +411,24 @@ Implementation notes for brotli:
   regardless of the `brotli_types` setting (`ngx_http_html_default_types` base).
 * Test 2 (compressed 404): assertion is header-only (`Content-Encoding: br`) because
   the nginx error page body is version-dependent and cannot be precomputed.
+
+Blocks deliberately dropped from fips-check:
+
+* (none) — no upstream test suite exists; test written from scratch.
+
+Implementation notes for fips-check:
+
+* The module has no upstream tests. The single observable behaviour is a
+  `NGX_LOG_NOTICE` message written to `error.log` at startup.
+* `%%TEST_GLOBALS%%` sets `error_log ... debug;` which captures NOTICE-level
+  messages. The assertion uses `$t->read_file('error.log')`.
+* The module's `fips_state` guard ensures the message fires exactly once
+  (init_module in the master process; worker processes inherit the non-UNKNOWN
+  state and produce no further output).
+* In a standard (non-FIPS) build, `FIPS_mode()` returns 0, so the message is
+  always `"OpenSSL FIPS Mode is not enabled"`.
+* A minimal HTTP server block is required so that `$t->run()` can confirm nginx
+  started by connecting to port 8080; no HTTP requests are made.
 
 Blocks deliberately dropped from subs-filter:
 
