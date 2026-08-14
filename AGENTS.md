@@ -335,6 +335,7 @@ to load the module), but both are legitimate if a suite needs it.
 | encrypted-session | 0.10 | done — 1 file (`sanity.t`) |
 | headers-more | 0bf283ff | done — 7 files (3 upstream files dropped) |
 | subs-filter | c6f825fa | done — 6 files, all upstream files converted |
+| brotli | 1.0.0rc | done — 2 files (`brotli.t`, `brotli_h2.t`) |
 
 Blocks deliberately dropped from set-misc:
 
@@ -378,6 +379,37 @@ Blocks deliberately dropped from headers-more:
 * All `--- stap` / `--- stap_out` assertions (SystemTap) in `input-conn.t`,
   `input-cookie.t`, and `input.t` — body assertions are kept.
 * All `--- error_log` / `--- no_error_log` assertions, per the policy above.
+
+Blocks deliberately dropped from brotli:
+
+The upstream test suite is a bash script (`script/.travis-test.sh`), not OpenResty
+`Test::Nginx::Socket`. Tests were written from scratch based on what the script checks.
+18 upstream tests total; 6 dropped, 12 converted across 2 files.
+
+* Test 1 (H1 long file with rate limit) — timing/rate-sensitive; large static file
+  spans multiple nginx buffers, making precomputed brotli bytes non-deterministic.
+* Test 16 (H2 long file with rate limit) — same reasons.
+* Tests 14–15 and H2 test 18 (`bar`, `b`, `b` tokens on `small.html`) — converted
+  faithfully: the upstream uses a `text/html` file which is always a brotli type
+  (nginx always includes `text/html` via `ngx_http_html_default_types` regardless
+  of `brotli_types` setting); assert plain body passes through unchanged.
+
+Implementation notes for brotli:
+
+* The upstream uses a bash/curl test harness, not OpenResty Socket DSL. No upstream
+  `.t` filenames to preserve; files are named after the upstream conf files.
+* Precomputed brotli bytes use `quality=1` (matching upstream `brotli_comp_level 1`)
+  and `lgwin=10` (the nginx filter's dynamic window selection for content < 1024 bytes:
+  `wbits = BROTLI_MIN_WINDOW_BITS; while wbits < conf->lg_win && len > (1<<wbits): wbits++`).
+  Generated with Python brotli 1.2.0: `brotli.compress(content, quality=1, lgwin=10)`.
+* `return 200 "string"` produces a single nginx buffer with `last_buf=1`, so
+  `BrotliEncoderCompressStream` is called once with `BROTLI_OPERATION_FINISH` —
+  identical to one-shot compression. Precomputed bytes are therefore deterministic.
+* `brotli_min_length 1` is set so short test strings (< 20 bytes default) are compressed.
+* `brotli_types text/plain` is added; `text/html` is always included by the module
+  regardless of the `brotli_types` setting (`ngx_http_html_default_types` base).
+* Test 2 (compressed 404): assertion is header-only (`Content-Encoding: br`) because
+  the nginx error page body is version-dependent and cannot be precomputed.
 
 Blocks deliberately dropped from subs-filter:
 
