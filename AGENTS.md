@@ -338,6 +338,7 @@ to load the module), but both are legitimate if a suite needs it.
 | brotli | 1.0.0rc | done — 2 files (`brotli.t`, `brotli_h2.t`) |
 | fips-check | 0.1 | done — 1 file (`fips_check.t`) |
 | geoip2 | 3.4 | done — 3 files (`geoip2.t`, `geoip2_proxy_recursive.t`, `geoip2_stream.t`) |
+| lua | 0.10.31 | done — 19 files written from scratch (upstream suite is 231 OpenResty-only files) |
 | njs | — | skipped — test suite maintained in the njs upstream repo and reused directly in pkg-oss CI; no conversion needed here |
 | acme | — | skipped — test suite maintained in the acme upstream repo and reused directly in pkg-oss CI; no conversion needed here |
 | ndk | — | skipped — no standalone observable behaviour; covered implicitly by set-misc and other module tests that depend on it |
@@ -492,3 +493,60 @@ phase, before headers-more modifies the headers. As a result, `return 200 $var`
 always sees the pre-modification value. Tests that need to observe the modified
 variable must use `proxy_pass` to a backend location, where `return 200 $var`
 runs in the content phase — after the rewrite phase is complete.
+
+Implementation notes for lua:
+
+* The upstream test suite (231 files) is written for OpenResty's
+  `Test::Nginx::Socket::Lua` and depends entirely on OpenResty modules.
+  Tests are written from scratch targeting the most commonly used directives.
+* **Exception to Hard Rule 1**: `*_by_lua_block` directives and lua-resty-core
+  modules (`ngx.balancer`, `ngx.ssl`, `ngx.ssl.clienthello`) are permitted
+  in lua's own test suite — they are the module under test, not helpers.
+* pkg-oss ships lua-resty-core (0.1.34rc3) and lua-resty-lrucache to
+  `/usr/share/nginx-luajit-2.1/`. LuaJIT's default `LUA_JPATH` resolves
+  resty modules there — **no `lua_package_path` is needed** in test configs.
+* Load order is mandatory: `ndk_http_module.so` must be loaded before
+  `ngx_http_lua_module.so`. Use `TEST_NGINX_GLOBALS` accordingly:
+  `load_module modules/ndk_http_module.so; load_module modules/ngx_http_lua_module.so;`
+* Tests use `$t->run()` directly — no `try_run`. The harness is expected to
+  load the module chain; startup failure is a hard test failure, not a skip.
+* Observation pattern for out-of-request-cycle hooks (balancer, SSL phases):
+  hooks write to `lua_shared_dict`; a plain HTTP location reads it back,
+  giving body-observable assertions with no error.log coupling.
+* `ssl_session_store/fetch_by_lua_block` tests pin `ssl_protocols TLSv1.2`
+  and `ssl_session_tickets off` so the session-cache path is taken. Falls
+  back to error.log assertion if shared-dict timing proves unreliable.
+* `lua_shared_dict` zones declared in `http {}` and `stream {}` contexts with
+  the same name conflict ("already declared for a different use"); use distinct
+  names or avoid cross-context shared dicts entirely.
+* `%%PORT_N%%` macros resolve to literal port N on some hosts; if consecutive
+  ports (8081, 8082 …) are in use by other services, use auto-substitution
+  (`127.0.0.1:8081`) for listen directives and `port(N)` in Perl assertions.
+  `socket_udp.t` was dropped because ports 8081 and 8082 were persistently
+  occupied; UDP cosocket API is structurally identical to TCP (covered by
+  `socket.t`).
+* `return 200 "text"` fires in the **rewrite phase**, before `access_by_lua_block`
+  runs. Access phase tests must use `content_by_lua_block { ngx.say("text") }`
+  as the content handler so it executes after the access phase completes.
+* `rewrite_by_lua_no_postpone` is `NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF` only
+  — it cannot be set at location level.
+* `ngx.exit(N)` in `balancer_by_lua_block` without a prior `set_current_peer`
+  call produces a 500 in nginx 1.31, not a controlled N response.
+* `ngx.socket.tcp():setkeepalive()` requires the connection to still be open;
+  using `receive("*a")` (read-until-close) with HTTP/1.0 closes the connection
+  before `setkeepalive` can pool it — test the keepalive API via HTTP/1.1 or
+  a raw TCP protocol instead.
+
+Directives not tested (lua module):
+* `balancer_by_lua_block` `ngx.balancer.set_more_tries/recreate_request` —
+  retry/recreate semantics need a live upstream that can fail.
+* `ssl_session_fetch_by_lua_block` body-observable assertion — session
+  resumption is TLS-version and client-library sensitive; error.log assertion
+  used instead.
+* `ngx.socket.udp()` — dropped due to persistent port conflict; see above.
+* `ngx.thread.spawn/wait/kill`, `ngx.location.capture_multi`,
+  `ngx.timer.every`, `ngx.on_abort`, `ngx.flush`, `ngx.send_headers`,
+  `ngx.eof`, `ngx.worker.*`, `ngx.config.*`, `ngx.null` — low priority or
+  requires complex setup; omitted per original directive-selection plan.
+* `rewrite_by_lua_no_postpone` — location-level placement not supported;
+  server/http-level use is implicitly exercised by redirect phase tests.
