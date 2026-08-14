@@ -30,3 +30,4 @@ Tests are converted from the test suite shipped with the listed module version.
 | [fips-check](fips-check/) | 0.1 |
 | [geoip2](geoip2/) | 3.4 |
 | [lua](lua/) | 0.10.31 |
+| [rtmp](rtmp/) | 1.2.2 |

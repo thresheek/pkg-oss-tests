@@ -342,7 +342,7 @@ to load the module), but both are legitimate if a suite needs it.
 | njs | — | skipped — test suite maintained in the njs upstream repo and reused directly in pkg-oss CI; no conversion needed here |
 | acme | — | skipped — test suite maintained in the acme upstream repo and reused directly in pkg-oss CI; no conversion needed here |
 | ndk | — | skipped — no standalone observable behaviour; covered implicitly by set-misc and other module tests that depend on it |
-| rtmp | — | skipped — requires RTMP protocol client; no tractable nginx-tests equivalent |
+| rtmp | 1.2.2 | done — 2 files (`rtmp.t`, `rtmp_publish.t`) |
 | otel | — | skipped — module maintained by the F5 team who track nginx compatibility directly; no conversion needed here |
 | auth-spnego | — | skipped — requires a live Kerberos KDC and keytab; not feasible in isolation |
 | passenger | — | skipped — requires Phusion Passenger and a Ruby/Python/Node application runtime |
@@ -493,6 +493,31 @@ phase, before headers-more modifies the headers. As a result, `return 200 $var`
 always sees the pre-modification value. Tests that need to observe the modified
 variable must use `proxy_pass` to a backend location, where `return 200 $var`
 runs in the content phase — after the rewrite phase is complete.
+
+Blocks deliberately dropped from rtmp:
+
+* (none) — no upstream test suite exists; tests written from scratch.
+
+Implementation notes for rtmp:
+
+* The upstream has no automated test suite — only interactive shell scripts
+  (`ffstream.sh`, `play.sh`) and browser-based Flash applets.
+* `rtmp.t` uses `IO::Socket::INET` to complete the RTMP handshake and send
+  an AMF `connect` command, asserting the server returns `_result`. The
+  old-style handshake (zero bytes at C1 offset 4-7) avoids HMAC-SHA256,
+  making it feasible with no CPAN dependencies.
+* `rtmp_publish.t` drives the RTMP publish flow in pure Perl using
+  `IO::Socket::INET` — no external tools or codecs required. It sends
+  `connect` → `createStream` → `publish "test" "live"` AMF commands.
+  nginx-rtmp marks the stream published (visible in `/stat`, `nclients=1`)
+  as soon as it receives the `publish` command, before any media data.
+  Non-blocking `sysread` + `IO::Select` are used to drain server responses
+  without hanging on the keep-open connection.
+* `rtmp_stat all` at `/stat` provides the only HTTP-observable surface without
+  an active RTMP session; the XML always contains `<rtmp>` and application
+  names regardless of whether anyone is connected.
+* Port 1935 (standard RTMP) is auto-substituted by the framework via the
+  `127.0.0.1:1935` pattern in the `rtmp { server { listen ... } }` block.
 
 Implementation notes for lua:
 
