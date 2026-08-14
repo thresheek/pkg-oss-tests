@@ -344,8 +344,40 @@ to load the module), but both are legitimate if a suite needs it.
 | ndk | — | skipped — no standalone observable behaviour; covered implicitly by set-misc and other module tests that depend on it |
 | rtmp | 1.2.2 | done — 2 files (`rtmp.t`, `rtmp_publish.t`) |
 | otel | — | skipped — module maintained by the F5 team who track nginx compatibility directly; no conversion needed here |
-| auth-spnego | — | skipped — requires a live Kerberos KDC and keytab; not feasible in isolation |
+| auth-spnego | 1.1.3 | done — 1 file (`auth_spnego.t`) |
 | passenger | — | skipped — requires Phusion Passenger and a Ruby/Python/Node application runtime |
+
+Blocks deliberately dropped from auth-spnego:
+
+* (none) — no upstream test suite exists; test written from scratch.
+
+Implementation notes for auth-spnego:
+
+* The module has no upstream automated test suite. The single test file
+  spins up a local MIT Kerberos KDC (port 60088) and tests full SPNEGO
+  authentication end-to-end.
+* Guarded by `has_daemon` checks for `krb5kdc`, `kadmin.local`,
+  `kdb5_util`, and `kinit`, plus a runtime check for the Perl `GSSAPI`
+  module (`eval { require GSSAPI }`).
+* `KRB5_CONFIG`, `KRB5_KDC_PROFILE`, and `KRB5CCNAME` are set in the
+  Perl process before `$t->run()` so that nginx worker processes inherit
+  them; the spnego module reads `KRB5_CONFIG` indirectly via the MIT
+  Kerberos library when loading the keytab.
+* The KDC is forked as a background process (`fork` + `exec krb5kdc -n`)
+  and terminated in an `END` block.
+* The Perl `GSSAPI` module calls `gss_init_sec_context` with
+  `gss_mech_krb5` to produce a client token from the credential cache.
+  nginx's `gss_accept_sec_context` accepts raw KRB5 tokens in addition to
+  SPNEGO-wrapped ones.
+* `auth_gss_format_full on` is required so `$remote_user` contains the
+  full `principal@REALM` string; otherwise the realm is stripped and the
+  assertion `qr/testuser\@NGINX\.TEST/` would not match.
+* Required packages per OS:
+  - Alpine: `krb5-server krb5 krb5-dev perl-gssapi` (community repo for perl-gssapi)
+  - Ubuntu: `krb5-kdc krb5-admin-server krb5-user libkrb5-dev libgssapi-perl`
+    (universe repo; `DEBIAN_FRONTEND=noninteractive` + debconf pre-seed required)
+  - RHEL 9: `krb5-server krb5-workstation krb5-devel` (CRB repo for krb5-devel)
+    + `cpanm GSSAPI` (perl-GSSAPI not in EPEL 9)
 
 Blocks deliberately dropped from set-misc:
 
