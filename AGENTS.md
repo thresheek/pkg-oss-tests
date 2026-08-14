@@ -334,6 +334,7 @@ to load the module), but both are legitimate if a suite needs it.
 | set-misc | 0.34 | done — 18 files, all upstream files converted |
 | encrypted-session | 0.10 | done — 1 file (`sanity.t`) |
 | headers-more | 0bf283ff | done — 7 files (3 upstream files dropped) |
+| subs-filter | c6f825fa | done — 6 files, all upstream files converted |
 
 Blocks deliberately dropped from set-misc:
 
@@ -377,6 +378,23 @@ Blocks deliberately dropped from headers-more:
 * All `--- stap` / `--- stap_out` assertions (SystemTap) in `input-conn.t`,
   `input-cookie.t`, and `input.t` — body assertions are kept.
 * All `--- error_log` / `--- no_error_log` assertions, per the policy above.
+
+Blocks deliberately dropped from subs-filter:
+
+* (none) — all 19 upstream tests converted.
+
+Implementation notes for subs-filter:
+
+* Tests that originally proxied to live external servers (yaoweibin.net) are
+  replaced by a local backend location returning `return 200 "Find taobao.com here."`
+  with `default_type text/html`. The substitution logic is identical; the content
+  only needs to contain the target string.
+* `--- user_files >>> foo.txt` for short content is replaced by `return 200 "content"`
+  with an appropriate `default_type`. Large-body tests (subs.t TEST 3–6) use
+  `$t->write_file()` to write a multi-kilobyte string of `a` characters.
+* `subs_filter` defaults to filtering `text/html` only. Locations using
+  `subs_filter_types text/plain` must also set `default_type text/plain` when
+  the response body comes from `return 200` rather than a file served by extension.
 
 Implementation note — `return 200 $var` vs `proxy_pass` for input-header tests:
 When a location adds any `proxy_set_header` directive it cancels **all**
