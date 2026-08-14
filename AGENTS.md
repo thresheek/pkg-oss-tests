@@ -337,6 +337,7 @@ to load the module), but both are legitimate if a suite needs it.
 | subs-filter | c6f825fa | done — 6 files, all upstream files converted |
 | brotli | 1.0.0rc | done — 2 files (`brotli.t`, `brotli_h2.t`) |
 | fips-check | 0.1 | done — 1 file (`fips_check.t`) |
+| geoip2 | 3.4 | done — 3 files (`geoip2.t`, `geoip2_proxy_recursive.t`, `geoip2_stream.t`) |
 
 Blocks deliberately dropped from set-misc:
 
@@ -411,6 +412,31 @@ Implementation notes for brotli:
   regardless of the `brotli_types` setting (`ngx_http_html_default_types` base).
 * Test 2 (compressed 404): assertion is header-only (`Content-Encoding: br`) because
   the nginx error page body is version-dependent and cannot be precomputed.
+
+Blocks deliberately dropped from geoip2:
+
+* (none) — no upstream test suite exists; tests written from scratch.
+
+Implementation notes for geoip2:
+
+* No upstream tests exist. Tests cover: country code lookup, default value for
+  unknown IPs, nested name lookup, metadata (`build_epoch`), `geoip2_proxy`,
+  `geoip2_proxy_recursive`, and stream module.
+* The `.mmdb` database is pre-generated with Python `mmdb_writer` 1.2.0
+  (ip_version=4, type=GeoIP2-Country) and embedded as base64 in all three test
+  files, decoded and written to `%%TESTDIR%%/country.mmdb` before `$t->run()`.
+  Contents: `1.2.3.0/24 → AU`, `2.3.4.0/24 → US`, `127.0.0.0/8 → CN`.
+* `source=$arg_ip` is used in `geoip2.t` to avoid the 127.0.0.1 loopback
+  problem with `$remote_addr` when making HTTP requests from the test client.
+* `geoip2_proxy_recursive` is `NGX_HTTP_MAIN_CONF` — it cannot vary per server
+  block, so the recursive test lives in its own file (`geoip2_proxy_recursive.t`)
+  with a dedicated nginx.conf setting `geoip2_proxy_recursive on`.
+* The stream test (`geoip2_stream.t`) connects from 127.0.0.1, which maps to CN
+  via `127.0.0.0/8`. A minimal HTTP server on port 8080 satisfies `$t->run()`
+  startup detection; the geoip2 stream server listens on port 8081.
+* `geoip2_proxy_recursive.t` test 2 verifies the edge case where the entire XFF
+  chain is trusted: the module exhausts the chain and falls back to `$remote_addr`
+  (127.0.0.1 → CN).
 
 Blocks deliberately dropped from fips-check:
 

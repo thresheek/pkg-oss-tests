@@ -28,3 +28,4 @@ Tests are converted from the test suite shipped with the listed module version.
 | [subs-filter](subs-filter/) | c6f825fa |
 | [brotli](brotli/) | 1.0.0rc |
 | [fips-check](fips-check/) | 0.1 |
+| [geoip2](geoip2/) | 3.4 |
