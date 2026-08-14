@@ -338,6 +338,13 @@ to load the module), but both are legitimate if a suite needs it.
 | brotli | 1.0.0rc | done — 2 files (`brotli.t`, `brotli_h2.t`) |
 | fips-check | 0.1 | done — 1 file (`fips_check.t`) |
 | geoip2 | 3.4 | done — 3 files (`geoip2.t`, `geoip2_proxy_recursive.t`, `geoip2_stream.t`) |
+| njs | — | skipped — test suite maintained in the njs upstream repo and reused directly in pkg-oss CI; no conversion needed here |
+| acme | — | skipped — test suite maintained in the acme upstream repo and reused directly in pkg-oss CI; no conversion needed here |
+| ndk | — | skipped — no standalone observable behaviour; covered implicitly by set-misc and other module tests that depend on it |
+| rtmp | — | skipped — requires RTMP protocol client; no tractable nginx-tests equivalent |
+| otel | — | skipped — module maintained by the F5 team who track nginx compatibility directly; no conversion needed here |
+| auth-spnego | — | skipped — requires a live Kerberos KDC and keytab; not feasible in isolation |
+| passenger | — | skipped — requires Phusion Passenger and a Ruby/Python/Node application runtime |
 
 Blocks deliberately dropped from set-misc:
 
