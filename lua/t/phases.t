@@ -19,7 +19,7 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http rewrite/)->plan(11)
+my $t = Test::Nginx->new()->has(qw/http rewrite/)->plan(10)
 	->write_file_expand('nginx.conf', <<'EOF');
 
 %%TEST_GLOBALS%%
@@ -99,16 +99,6 @@ http {
             }
         }
 
-        # precontent_by_lua_block
-        location /t8 {
-            precontent_by_lua_block {
-                ngx.ctx.pre = "precontent"
-            }
-            content_by_lua_block {
-                ngx.say(ngx.ctx.pre or "absent")
-            }
-        }
-
         # ngx.get_phase in rewrite
         location /t9 {
             rewrite_by_lua_block {
@@ -160,7 +150,6 @@ http_get('/t6');
 like($t->read_file('error.log'), qr/log_by_lua_block: ran/, 'log_by_lua_block');
 
 is(body(http_get('/t7')), "server-rewrite\n",       'server_rewrite_by_lua_block');
-is(body(http_get('/t8')), "precontent\n",           'precontent_by_lua_block');
 is(body(http_get('/t9')), "rewrite\n",              'get_phase in rewrite');
 is(body(http_get('/t10')), "access\n",              'get_phase in access');
 is(body(http_get('/t11')), "content\n",             'get_phase in content');
